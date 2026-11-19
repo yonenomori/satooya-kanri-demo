@@ -163,7 +163,7 @@ wrangler.jsonc
 
 ポートフォリオ用に Cloudflare Workers へ公開しています（収録データはダミーのみ）。
 
-**https://satooya-kanri-demo.r-yoneyama.workers.dev**
+**https://satooya-kanri-demo.temaoff.workers.dev**
 
 - `ENVIRONMENT=demo` のときは Cloudflare Access を介さず、`dev-a@example.com`（スタッフA）として動作します。URL を開いた人がそのまま検索・登録・NG 警告まで試せます
 - そのときは画面上部に「デモ版（ダミーデータ）」の帯を出します。`production` は従来どおり Access の JWT 検証です
