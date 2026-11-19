@@ -1,0 +1,28 @@
+# 依存パッケージの更新PRを自動で作成する
+# セキュリティ修正はこの設定とは別に、リポジトリ設定の「Dependabot security updates」で随時PRが作られる
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    groups:
+      # パッチ・マイナー更新は1つのPRにまとめる（テストが通ればマージ可）
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+    # メジャー更新は個別のPRになる（変更履歴を読んでからマージ）
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      timezone: "Asia/Tokyo"
+    labels: ["dependencies", "ci"]
+    groups:
+      actions:
+        patterns: ["*"]
