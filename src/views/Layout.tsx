@@ -18,6 +18,7 @@ export const Layout = ({ title, staff, children }: Props) => (
       <meta name="robots" content="noindex, nofollow" />
       <meta name="theme-color" content="#1E5F52" />
       <title>{title} | 里親・ブリーダー管理</title>
+      <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
       <link rel="stylesheet" href="/style.css" />
     </head>
     <body>

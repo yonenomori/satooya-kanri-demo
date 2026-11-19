@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="里親・ブリーダー管理">
+  <rect width="64" height="64" rx="14" fill="#1E5F52"/>
+  <g fill="#FFFFFF">
+    <ellipse cx="22" cy="26" rx="5" ry="6.5" transform="rotate(-18 22 26)"/>
+    <ellipse cx="32" cy="21.5" rx="5" ry="7"/>
+    <ellipse cx="42" cy="26" rx="5" ry="6.5" transform="rotate(18 42 26)"/>
+    <ellipse cx="48.5" cy="35" rx="4.2" ry="5.2" transform="rotate(32 48.5 35)"/>
+    <path d="M32 32c7 0 12.5 5.4 12.5 11.6 0 5-3.9 8.4-8.7 8.4-1.6 0-2.6-.6-3.8-.6s-2.2.6-3.8.6c-4.8 0-8.7-3.4-8.7-8.4C19.5 37.4 25 32 32 32z"/>
+  </g>
+</svg>
