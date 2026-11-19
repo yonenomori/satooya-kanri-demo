@@ -1,0 +1,25 @@
+{
+  "name": "satooya-kanri-demo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "里親・ブリーダー管理システム（デモ版）— Cloudflare Workers + Hono + D1",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply satooya-db --local",
+    "db:seed:local": "wrangler d1 execute satooya-db --local --file=seed/dev.sql"
+  },
+  "dependencies": {
+    "hono": "^4.13.19",
+    "jose": "^6.2.18"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261119.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.12",
+    "wrangler": "^4.165.0"
+  }
+}

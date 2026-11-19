@@ -1,0 +1,4 @@
+# ローカル開発用の設定（このファイルはコミットしない）
+# コピーして使う: cp .dev.vars.example .dev.vars
+ENVIRONMENT=development
+DEV_USER_EMAIL=dev-a@example.com
