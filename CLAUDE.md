@@ -52,5 +52,7 @@
 
 - 開発: `npm run dev`
 - テスト: `npm test`
+- 型チェック: `npm run typecheck`
+- ダミーデータ投入（ローカル）: `npm run db:seed:local`
 - マイグレーション（ローカル）: `npx wrangler d1 migrations apply satooya-db --local`
 - デプロイ: `npm run deploy`
