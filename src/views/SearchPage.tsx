@@ -76,7 +76,7 @@ export const SearchPage = ({ q, kind, rows, staff }: Props) => {
                   {row.phone ? <span class="row-meta">{row.phone}</span> : null}
                   {row.address ? <span class="row-meta">{row.address}</span> : null}
                   {isNg && row.latest_ng_category && row.latest_ng_detail ? (
-                    <span class="row-ng">
+                    <span class="row-ng-detail">
                       NG：{categoryLabel(row.latest_ng_category)}：{row.latest_ng_detail}
                     </span>
                   ) : null}

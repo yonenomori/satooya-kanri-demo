@@ -75,7 +75,8 @@ a {
 .app-main {
   max-width: 560px;
   margin: 0 auto;
-  padding: 16px 16px calc(120px + env(safe-area-inset-bottom));
+  /* 下部固定バー（44+8+44+上下12 ≒ 120px）＋余白ぶんを空ける */
+  padding: 16px 16px calc(140px + env(safe-area-inset-bottom));
 }
 
 /* 公開デモ（ENVIRONMENT=demo）のときだけ出る帯 */
@@ -212,6 +213,9 @@ h3 {
 }
 
 .row {
+  /* 行そのものは常に通常のブロック。行の中の文字にだけ省略をかける
+     （Safari では display:-webkit-box が行全体にかかると中身ごと1行に潰れる） */
+  display: block;
   background: var(--surface);
   border: 1px solid var(--line);
   border-left: 4px solid transparent;
@@ -246,6 +250,7 @@ h3 {
 }
 
 .row-kind {
+  flex-shrink: 0;
   font-size: 11px;
   color: var(--muted);
   border: 1px solid var(--line);
@@ -271,14 +276,15 @@ h3 {
   word-break: break-all;
 }
 
-.row-ng {
+/* NG 理由の1行（.row-ng は行の見た目用なので、文字用は別クラスにする） */
+.row-ng-detail {
+  display: block;
   font-size: 13px;
   color: var(--ng);
   font-weight: 700;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .row-check-reason {
