@@ -159,11 +159,26 @@ wrangler.jsonc
 
 `phone_normalized` / `address_normalized` / `city` は保存時に必ず再計算します（手入力させない）。
 
+## 公開デモ
+
+ポートフォリオ用に Cloudflare Workers へ公開しています（収録データはダミーのみ）。
+
+**https://satooya-kanri-demo.r-yoneyama.workers.dev**
+
+- `ENVIRONMENT=demo` のときは Cloudflare Access を介さず、`dev-a@example.com`（スタッフA）として動作します。URL を開いた人がそのまま検索・登録・NG 警告まで試せます
+- そのときは画面上部に「デモ版（ダミーデータ）」の帯を出します。`production` は従来どおり Access の JWT 検証です
+- デモ環境の設定は `wrangler.demo.jsonc`（実際のアカウント ID・D1 ID を含むためコミットしない）に置いています
+
+```bash
+npx wrangler d1 migrations apply satooya-kanri-demo-db --remote -c wrangler.demo.jsonc
+npx wrangler d1 execute satooya-kanri-demo-db --remote --file=seed/dev.sql -c wrangler.demo.jsonc
+npx wrangler deploy -c wrangler.demo.jsonc
+```
+
 ## 本番デプロイ
 
 Cloudflare アカウントと Access の設定が必要です。手順は [docs/deploy.md](docs/deploy.md) を参照してください。
-このデモリポジトリ自体はデプロイしておらず、`deploy.yml` は手動実行（`workflow_dispatch`）のみにしています。
-実案件では main へのマージでテスト → マイグレーション → デプロイが走る構成です（[docs/maintenance.md](docs/maintenance.md)）。
+上のデモは「Access なし・ダミーデータ」の構成で、実案件のように Access でスタッフだけを通す場合は docs/deploy.md の手順（`ENVIRONMENT=production`）を使います。
 
 ## デモ版での実装メモ
 

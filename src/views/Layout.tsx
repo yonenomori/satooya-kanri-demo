@@ -28,6 +28,11 @@ export const Layout = ({ title, staff, children }: Props) => (
         </a>
         {staff ? <span class="app-staff">{staff.name}</span> : null}
       </header>
+      {staff?.demo ? (
+        <p class="demo-banner">
+          デモ版（ダミーデータ）— ログインなしで自由に試せます。実在の顧客情報は含みません。
+        </p>
+      ) : null}
       <main class="app-main">{children}</main>
     </body>
   </html>

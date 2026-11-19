@@ -3,6 +3,8 @@
  *
  * 1. ENVIRONMENT=development のときだけ DEV_USER_EMAIL をログインユーザーとみなす
  *    （production で DEV_USER_EMAIL が設定されていたら設定ミスとして 500）
+ * 1b. ENVIRONMENT=demo のときは認証せず、DEMO_USER_EMAIL（既定 dev-a@example.com）でログインした扱いにする。
+ *    ポートフォリオ用の公開デモで、URL を開いた人がすぐ触れるようにするためのもの
  * 2. 本番は Cloudflare Access の Cf-Access-Jwt-Assertion を検証する（aud = ACCESS_AUD）
  * 3. メールで staff を引き、見つからない・無効なら 403
  * 4. 以降のハンドラへ staff を渡す（isAdmin は ADMIN_EMAILS で判定）
@@ -15,6 +17,9 @@ import type { Context } from 'hono';
 import type { AppEnv } from '../env';
 import { findStaffByEmail } from '../db/contacts';
 import { ErrorPage } from '../views/ErrorPage';
+
+/** 公開デモ（ENVIRONMENT=demo）でログイン扱いにするメール。seed/dev.sql のスタッフA */
+export const DEMO_USER_EMAIL = 'dev-a@example.com';
 
 /** JWKS は isolate 内で使い回す */
 let cached: { domain: string; jwks: JWTVerifyGetKey } | null = null;
@@ -52,8 +57,9 @@ function errorPage(
 export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   const env = c.env;
   const isDevelopment = env.ENVIRONMENT === 'development';
+  const isDemo = env.ENVIRONMENT === 'demo';
 
-  if (!isDevelopment && env.DEV_USER_EMAIL) {
+  if (!isDevelopment && !isDemo && env.DEV_USER_EMAIL) {
     return errorPage(
       c,
       500,
@@ -64,8 +70,11 @@ export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
 
   let email: string | null = null;
 
-  if (isDevelopment) {
-    const devEmail = env.DEV_USER_EMAIL?.trim();
+  if (isDevelopment || isDemo) {
+    // デモは未設定でも動くように既定のメールを使う（データは seed/dev.sql のダミーのみ）
+    const devEmail = isDemo
+      ? (env.DEMO_USER_EMAIL?.trim() || DEMO_USER_EMAIL)
+      : env.DEV_USER_EMAIL?.trim();
     if (!devEmail) {
       return errorPage(
         c,
@@ -128,6 +137,7 @@ export const authMiddleware = createMiddleware<AppEnv>(async (c, next) => {
     name: staffRow.name,
     email: staffRow.email,
     isAdmin: adminEmails(env.ADMIN_EMAILS).includes(staffRow.email.toLowerCase()),
+    demo: isDemo,
   });
 
   await next();
