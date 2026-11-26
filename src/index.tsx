@@ -32,14 +32,33 @@ import {
   type ContactKind,
   type ContactRow,
 } from './db/contacts';
+import {
+  addSubscriptionItem,
+  changeSubscriptionStatus,
+  createMenu,
+  createSubscription,
+  getMenu,
+  getSubscription,
+  getSubscriptionItemOwner,
+  getSubscriptionItems,
+  listMenus,
+  listSubscriptions,
+  listSubscriptionsForContact,
+  removeSubscriptionItem,
+  updateMenu,
+  updateSubscriptionMemo,
+  type SubscriptionFilter,
+} from './db/subscriptions';
 import { csvFileName, toCsv } from './lib/csv';
 import { defaultStatus, isCategoryForKind, kindLabel, statusOptions, todayInJapan } from './lib/labels';
 import { findMatches, type Match } from './lib/matching';
+import { isSubscriptionAction, parsePrice, parseQuantity, parseSubscriptionNo } from './lib/subscription';
 import { ContactForm, type ContactFormValues } from './views/ContactForm';
 import { DetailPage } from './views/DetailPage';
 import { ErrorPage } from './views/ErrorPage';
 import { Layout } from './views/Layout';
 import { SearchPage } from './views/SearchPage';
+import { MenuPage, SubscriptionListPage, SubscriptionPage } from './views/SubscriptionViews';
 
 const app = new Hono<AppEnv>();
 
@@ -48,6 +67,7 @@ app.use('*', authMiddleware);
 
 const CHANNELS = ['line', 'instagram', 'phone', 'visit', 'other'] as const;
 const KINDS = ['adopter', 'breeder'] as const;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function asText(value: unknown): string {
   return typeof value === 'string' ? value : '';
@@ -263,12 +283,14 @@ app.get('/contacts/:id', async (c) => {
   const contact = await getContact(db, id);
   if (contact === null) return notFoundPage(c);
 
-  const [staffList, activeNg, revokedNg, notes, households] = await Promise.all([
+  const [staffList, activeNg, revokedNg, notes, households, subscriptions, menus] = await Promise.all([
     listStaff(db),
     getActiveNgRecords(db, id),
     getRevokedNgRecords(db, id),
     getNotes(db, id),
     getHouseholdCandidates(db, contact),
+    listSubscriptionsForContact(db, id),
+    listMenus(db, { activeOnly: true }),
   ]);
 
   const errorParam = c.req.query('error');
@@ -279,7 +301,9 @@ app.get('/contacts/:id', async (c) => {
         ? 'NGの詳細を入力してください。'
         : errorParam === 'note_body'
           ? 'メモの内容を入力してください。'
-          : undefined;
+          : errorParam === 'subscription'
+            ? 'サブスクを開始できませんでした。メニュー・数量・開始日を確認してください。'
+            : undefined;
 
   return c.html(
     <DetailPage
@@ -289,6 +313,8 @@ app.get('/contacts/:id', async (c) => {
       revokedNg={revokedNg}
       notes={notes}
       households={households}
+      subscriptions={subscriptions}
+      menus={menus}
       today={todayInJapan()}
       errorMessage={errorMessage}
       staff={c.get('staff')}
@@ -421,6 +447,194 @@ app.post('/ng/:ngId/revoke', async (c) => {
 });
 
 /* ------------------------------------------------------------------ */
+/* サブスク（ペットフードの定期提供）                                  */
+/*   管理番号 = subscriptions.id を 5 桁表示。終了した番号は二度と使わない */
+/* ------------------------------------------------------------------ */
+
+const SUBSCRIPTION_FILTERS: SubscriptionFilter[] = ['open', 'active', 'paused', 'ended', 'all'];
+
+const SUBSCRIPTION_ERRORS: Record<string, string> = {
+  status: 'この操作はできません。画面を開き直して、現在の状態を確認してください。',
+  ended: 'このサブスクは終了しているため変更できません。',
+  item: 'メニューを追加できませんでした。販売中のメニューと数量を選んでください。',
+  confirm: '終了するには確認のチェックを入れてください。',
+  end_date: '終了日を正しく入力してください。',
+};
+
+app.get('/subscriptions', async (c) => {
+  const filterParam = c.req.query('filter') ?? 'open';
+  const filter = (SUBSCRIPTION_FILTERS as string[]).includes(filterParam) ? (filterParam as SubscriptionFilter) : 'open';
+  const no = (c.req.query('no') ?? '').trim();
+  const id = no === '' ? null : parseSubscriptionNo(no);
+  const rows = no !== '' && id === null ? [] : await listSubscriptions(c.env.DB, { filter, id });
+  return c.html(<SubscriptionListPage filter={filter} no={no} rows={rows} staff={c.get('staff')} />);
+});
+
+app.post('/contacts/:id/subscriptions', async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return notFoundPage(c);
+  const contact = await getContact(c.env.DB, id);
+  if (contact === null) return notFoundPage(c);
+  if (contact.kind !== 'adopter') return c.redirect(`/contacts/${id}`, 303);
+
+  const body = await c.req.parseBody();
+  const menuId = parseId(asText(body.menuId));
+  const quantity = parseQuantity(asText(body.quantity));
+  const startedOn = asText(body.startedOn);
+  const memo = asText(body.memo).trim();
+
+  const menu = menuId === null ? null : await getMenu(c.env.DB, menuId);
+  if (menu === null || menu.is_active !== 1 || quantity === null || !DATE_RE.test(startedOn)) {
+    return c.redirect(`/contacts/${id}?error=subscription#subscriptions`, 303);
+  }
+
+  const subId = await createSubscription(
+    c.env.DB,
+    { contactId: id, startedOn, memo: memo === '' ? null : memo, menuId: menu.id, quantity },
+    c.get('staff').id
+  );
+  return c.redirect(`/subscriptions/${subId}`, 303);
+});
+
+app.get('/subscriptions/:id', async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return notFoundPage(c);
+  const db = c.env.DB;
+  const sub = await getSubscription(db, id);
+  if (sub === null) return notFoundPage(c);
+
+  const [allItems, menus, staffList] = await Promise.all([
+    getSubscriptionItems(db, id, { includeRemoved: true }),
+    listMenus(db, { activeOnly: true }),
+    listStaff(db),
+  ]);
+
+  const errorParam = c.req.query('error') ?? '';
+  return c.html(
+    <SubscriptionPage
+      sub={sub}
+      items={allItems.filter((item) => item.removed_at === null)}
+      removedItems={allItems.filter((item) => item.removed_at !== null)}
+      menus={menus}
+      staffList={staffList}
+      today={todayInJapan()}
+      errorMessage={SUBSCRIPTION_ERRORS[errorParam]}
+      staff={c.get('staff')}
+    />
+  );
+});
+
+app.post('/subscriptions/:id/status', async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return notFoundPage(c);
+  const sub = await getSubscription(c.env.DB, id);
+  if (sub === null) return notFoundPage(c);
+  if (sub.status === 'ended') return c.redirect(`/subscriptions/${id}?error=ended`, 303);
+
+  const body = await c.req.parseBody();
+  const action = asText(body.action);
+  if (!isSubscriptionAction(action)) return c.redirect(`/subscriptions/${id}?error=status`, 303);
+
+  const endedOn = asText(body.endedOn);
+  if (action === 'end') {
+    if (asText(body.confirm) !== '1') return c.redirect(`/subscriptions/${id}?error=confirm`, 303);
+    if (!DATE_RE.test(endedOn) || endedOn < sub.started_on) {
+      return c.redirect(`/subscriptions/${id}?error=end_date`, 303);
+    }
+  }
+
+  const reason = asText(body.endReason).trim();
+  const next = await changeSubscriptionStatus(
+    c.env.DB,
+    id,
+    action,
+    { endedOn, endReason: reason === '' ? null : reason },
+    c.get('staff').id
+  );
+  if (next === null) return c.redirect(`/subscriptions/${id}?error=status`, 303);
+  return c.redirect(`/subscriptions/${id}`, 303);
+});
+
+app.post('/subscriptions/:id/memo', async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return notFoundPage(c);
+  const body = await c.req.parseBody();
+  const memo = asText(body.memo).trim();
+  const ok = await updateSubscriptionMemo(c.env.DB, id, memo === '' ? null : memo, c.get('staff').id);
+  return c.redirect(`/subscriptions/${id}${ok ? '' : '?error=ended'}`, 303);
+});
+
+app.post('/subscriptions/:id/items', async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return notFoundPage(c);
+  const sub = await getSubscription(c.env.DB, id);
+  if (sub === null) return notFoundPage(c);
+  if (sub.status === 'ended') return c.redirect(`/subscriptions/${id}?error=ended`, 303);
+
+  const body = await c.req.parseBody();
+  const menuId = parseId(asText(body.menuId));
+  const quantity = parseQuantity(asText(body.quantity));
+  if (menuId === null || quantity === null) return c.redirect(`/subscriptions/${id}?error=item`, 303);
+
+  const ok = await addSubscriptionItem(c.env.DB, id, { menuId, quantity }, c.get('staff').id);
+  return c.redirect(`/subscriptions/${id}${ok ? '' : '?error=item'}`, 303);
+});
+
+app.post('/subscription-items/:itemId/remove', async (c) => {
+  const itemId = parseId(c.req.param('itemId'));
+  if (itemId === null) return notFoundPage(c);
+  const removed = await removeSubscriptionItem(c.env.DB, itemId, c.get('staff').id);
+  if (removed === null) {
+    // 終了済み・すでに外したメニューなど。持ち主のサブスクが分かればそこへ戻す
+    const owner = await getSubscriptionItemOwner(c.env.DB, itemId);
+    return owner === null ? notFoundPage(c) : c.redirect(`/subscriptions/${owner}?error=status`, 303);
+  }
+  return c.redirect(`/subscriptions/${removed.subscriptionId}`, 303);
+});
+
+/* メニュー管理 */
+
+const MENU_ERRORS: Record<string, string> = {
+  name: 'メニューの名前を入力してください。',
+  price: '価格は半角数字（円）で入力してください。未定なら空欄にしてください。',
+};
+
+function readMenuForm(body: Record<string, string | File>):
+  | { ok: true; name: string; price: number | null; description: string | null }
+  | { ok: false; error: 'name' | 'price' } {
+  const name = asText(body.name).trim();
+  if (name === '') return { ok: false, error: 'name' };
+  const price = parsePrice(asText(body.price));
+  if (price === undefined) return { ok: false, error: 'price' };
+  const description = asText(body.description).trim();
+  return { ok: true, name, price, description: description === '' ? null : description };
+}
+
+app.get('/menus', async (c) => {
+  const menus = await listMenus(c.env.DB);
+  const errorParam = c.req.query('error') ?? '';
+  return c.html(<MenuPage menus={menus} errorMessage={MENU_ERRORS[errorParam]} staff={c.get('staff')} />);
+});
+
+app.post('/menus', async (c) => {
+  const form = readMenuForm(await c.req.parseBody());
+  if (!form.ok) return c.redirect(`/menus?error=${form.error}`, 303);
+  await createMenu(c.env.DB, form, c.get('staff').id);
+  return c.redirect('/menus', 303);
+});
+
+app.post('/menus/:id', async (c) => {
+  const id = parseId(c.req.param('id'));
+  if (id === null) return notFoundPage(c);
+  const body = await c.req.parseBody();
+  const form = readMenuForm(body);
+  if (!form.ok) return c.redirect(`/menus?error=${form.error}`, 303);
+  const ok = await updateMenu(c.env.DB, id, { ...form, isActive: asText(body.isActive) === '1' }, c.get('staff').id);
+  if (!ok) return notFoundPage(c);
+  return c.redirect('/menus', 303);
+});
+
+/* ------------------------------------------------------------------ */
 /* 管理メニュー・CSV エクスポート（管理者のみ）                        */
 /* ------------------------------------------------------------------ */
 
@@ -450,6 +664,11 @@ app.get('/admin', (c) => {
           <li>
             <a class="btn btn-ghost btn-block" href="/admin/export/notes.csv">
               やり取りメモ（notes）をダウンロード
+            </a>
+          </li>
+          <li>
+            <a class="btn btn-ghost btn-block" href="/admin/export/subscriptions.csv">
+              サブスク（subscriptions）をダウンロード
             </a>
           </li>
         </ul>

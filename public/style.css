@@ -758,3 +758,95 @@ select.input {
     border-radius: 12px 12px 0 0;
   }
 }
+
+/* ヘッダーのナビ */
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.app-nav a {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 10px 4px;
+}
+
+.app-nav .app-staff {
+  max-width: 7em;
+}
+
+/* サブスク */
+.sub-no {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.badge-sub-active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.badge-sub-paused {
+  background: var(--check-bg);
+  color: var(--check);
+  border: 1px solid var(--check);
+}
+
+.badge-sub-ended {
+  background: #e2e2dd;
+  color: #3d4247;
+}
+
+.row-ended .row-link {
+  opacity: 0.75;
+}
+
+.sub-head-no {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sub-head-ended {
+  background: #f0f0ec;
+}
+
+.sub-total {
+  margin: 12px 0 0;
+  font-weight: 700;
+}
+
+.inline-form {
+  margin: 4px 0 0;
+}
+
+.btn-sm {
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 14px;
+}
+
+.check-label {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.check-label input {
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  flex-shrink: 0;
+}
+
+.note-inactive {
+  opacity: 0.7;
+}

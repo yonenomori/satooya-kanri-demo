@@ -33,6 +33,8 @@
 - **やり取りメモ** … LINE／Instagram／電話／来店／その他 を手入力で記録
 - **CSV エクスポート（管理者のみ）** … contacts / ng_records / notes を UTF-8 BOM 付きで出力（バックアップ用途）
 - **操作ログ** … 登録・更新・NG 操作にログイン中のスタッフ ID を自動記録
+- **ペットフードのサブスク** … 里親ごとに管理番号（`00001` 形式）付きで開始。オン／オフの切り替え、メニューの追加・外す。**終了した番号は二度と使わない**（アプリと DB トリガーの両方で保証）
+- **メニュー管理** … ペットフードのメニュー（名前・価格・説明）を追加・編集。削除せず販売停止にできる
 
 ## 技術スタック
 
@@ -95,6 +97,8 @@ npm run dev
 2. 「新規登録」で電話番号 `090-0000-1234` を入れて保存 → NG 警告が出る → 「確認して保存」で登録できる
 3. 「山田 花子」の詳細を開く → 「同じ世帯の可能性がある人」に山田 太郎が出る
 4. 詳細画面で NG 理由を追加 → 解除（解除理由必須）→ 解除済みとして履歴に残る
+5. ヘッダーの「サブスク」→ No.00002（オン）を開いて「オフにする」→ メニューを追加 → 終了すると、No.00002 は二度と使われず、次に開始したサブスクは新しい番号になる
+6. 「終了」タブの No.00001 はオンに戻せない（再開は新しい番号で）
 
 `ADMIN_EMAILS` に自分のメールを入れると `/admin` から CSV をダウンロードできます。
 
@@ -108,6 +112,7 @@ npm test            # vitest run
 - `test/normalize.test.ts` … 電話・住所・市区町村の正規化（設計書のケースをすべて収録）
 - `test/matching.test.ts` … 照合の判定（NG／要確認／登録済み）、並び順、SQL のバインドパラメータ
 - `test/contacts.test.ts` … 保存値の組み立て、検索語の判定、LIKE エスケープ、CSV、日時表示
+- `test/subscription.test.ts` … 管理番号・状態遷移のルールと、実際のマイグレーションを当てた SQLite（`node:sqlite`）での開始・オン／オフ・終了・番号が再利用されないこと・トリガー
 
 CI（`.github/workflows/ci.yml`）は PR ごとに `npm ci` → 型チェック → テスト → `npm audit --audit-level=high` を実行します。
 
@@ -122,6 +127,7 @@ docs/
   deploy.md          … 本番デプロイ手順
 migrations/
   0001_init.sql      … D1 スキーマ
+  0002_subscriptions.sql … サブスク・メニュー（終了済みを守るトリガー付き）
 seed/
   dev.sql            … ローカル用ダミーデータ（本番には入れない）
 public/
@@ -137,10 +143,13 @@ src/
     matching.ts      … 照合（ng / check / duplicate）
     labels.ts        … 日本語ラベル
     csv.ts           … CSV 出力
+    subscription.ts  … 管理番号の表示・解釈、状態遷移などサブスクのルール
   db/
     contacts.ts      … contacts / ng_records / notes へのクエリ
+    subscriptions.ts … menus / subscriptions / subscription_items へのクエリ
   views/
     Layout.tsx / SearchPage.tsx / ContactForm.tsx / MatchAlert.tsx / DetailPage.tsx / ErrorPage.tsx
+    SubscriptionViews.tsx … サブスク一覧・詳細・メニュー管理
 test/
   normalize.test.ts / matching.test.ts / contacts.test.ts
 wrangler.jsonc
@@ -148,7 +157,7 @@ wrangler.jsonc
 
 ## データベース
 
-`migrations/0001_init.sql` がスキーマの正です。主なテーブルは次の 4 つです。
+`migrations/` がスキーマの正です。主なテーブルは次のとおりです。
 
 | テーブル | 役割 |
 | --- | --- |
@@ -156,6 +165,9 @@ wrangler.jsonc
 | `contacts` | 里親・ブリーダー（`kind` で区別。照合用に `phone_normalized` / `address_normalized` / `city` を保存） |
 | `ng_records` | NG 記録（1人に複数。`revoked_at` で解除履歴を残す） |
 | `notes` | やり取りメモ |
+| `menus` | ペットフードのメニュー（販売中／販売停止） |
+| `subscriptions` | サブスク契約。`id` を 5 桁表示したものが管理番号（AUTOINCREMENT で再利用しない） |
+| `subscription_items` | サブスクに入っているメニューと数量（外した記録も残す） |
 
 `phone_normalized` / `address_normalized` / `city` は保存時に必ず再計算します（手入力させない）。
 
@@ -170,7 +182,7 @@ wrangler.jsonc
 - デモ環境の設定は `wrangler.demo.jsonc`（実際のアカウント ID・D1 ID を含むためコミットしない）に置いています
 
 ```bash
-npx wrangler d1 migrations apply satooya-kanri-demo-db --remote -c wrangler.demo.jsonc
+npx wrangler d1 migrations apply satooya-kanri-demo-db --remote -c wrangler.demo.jsonc   # 0002_subscriptions.sql も適用される
 npx wrangler d1 execute satooya-kanri-demo-db --remote --file=seed/dev.sql -c wrangler.demo.jsonc
 npx wrangler deploy -c wrangler.demo.jsonc
 ```

@@ -9,7 +9,9 @@ import {
   kindLabel,
   statusLabel,
 } from '../lib/labels';
+import type { MenuRow, SubscriptionListRow } from '../db/subscriptions';
 import { Layout } from './Layout';
+import { ContactSubscriptions } from './SubscriptionViews';
 
 type Props = {
   contact: ContactRow;
@@ -18,6 +20,8 @@ type Props = {
   revokedNg: NgRecordRow[];
   notes: NoteRow[];
   households: HouseholdCandidate[];
+  subscriptions: SubscriptionListRow[];
+  menus: MenuRow[];
   today: string;
   errorMessage?: string;
   staff: Staff;
@@ -30,6 +34,8 @@ export const DetailPage = ({
   revokedNg,
   notes,
   households,
+  subscriptions,
+  menus,
   today,
   errorMessage,
   staff,
@@ -203,6 +209,16 @@ export const DetailPage = ({
           </ul>
         )}
       </section>
+
+      {contact.kind === 'adopter' ? (
+        <ContactSubscriptions
+          contactId={contact.id}
+          subscriptions={subscriptions}
+          menus={menus}
+          today={today}
+          isNg={isNg}
+        />
+      ) : null}
 
       <section class="card" id="notes">
         <h2 class="section-title">
