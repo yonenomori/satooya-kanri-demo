@@ -26,7 +26,10 @@ export const Layout = ({ title, staff, children }: Props) => (
         <a class="app-title" href="/">
           里親・ブリーダー管理
         </a>
-        {staff ? <span class="app-staff">{staff.name}</span> : null}
+        <nav class="app-nav" aria-label="メニュー">
+          <a href="/subscriptions">サブスク</a>
+          {staff ? <span class="app-staff">{staff.name}</span> : null}
+        </nav>
       </header>
       {staff?.demo ? (
         <p class="demo-banner">

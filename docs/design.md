@@ -249,3 +249,49 @@ findMatches(db, input: { id?: number; kind; familyName?; phoneNormalized?; addre
 | no_health_check / missing_documents / condition_mismatch | 健康診断の未実施 / 書類不備 / 説明と異なる状態での引き渡し |
 | other | その他 |
 | line / instagram / phone / visit / other | LINE / Instagram / 電話 / 来店 / その他 |
+
+## 12. サブスク（ペットフードの定期提供）
+
+テーブルは `migrations/0002_subscriptions.sql`。
+
+| テーブル | 役割 |
+| --- | --- |
+| `menus` | メニュー。`is_active`（1: 販売中 / 0: 販売停止）。削除しない |
+| `subscriptions` | サブスク契約。`id` が管理番号の元。`status` は active / paused / ended |
+| `subscription_items` | サブスクに入っているメニューと数量。外したら `removed_at` |
+
+### 管理番号
+- `subscriptions.id`（`INTEGER PRIMARY KEY AUTOINCREMENT`）を 5 桁ゼロ埋めで表示する（`src/lib/subscription.ts` の `formatSubscriptionNo`）
+- AUTOINCREMENT は一度払い出した番号を再利用しない。行が消えても次の番号は進む
+- 入力は `parseSubscriptionNo` で `00001` / `1` / `No.00001` / 全角を受け付ける
+
+### 状態遷移
+
+| 現在 | オン | オフ | 終了 |
+| --- | --- | --- | --- |
+| active（オン） | — | paused | ended |
+| paused（オフ） | active | — | ended |
+| ended（終了） | 不可 | 不可 | 不可 |
+
+- 終了には終了日（開始日以降）と確認チェックが必須。終了理由は任意
+- 終了済みは、アプリ（`nextStatus`、各 UPDATE の `status != 'ended'` 条件）と DB トリガーの両方で変更を止める
+  - `trg_subscriptions_ended_is_final`: 終了済みの UPDATE を中止
+  - `trg_subscriptions_no_delete`: サブスクの DELETE を中止
+  - `trg_subscription_items_*`: 終了済みへのメニュー追加・変更、販売停止メニューの追加を中止
+
+### 画面・ルーティング
+
+| メソッド | パス | 内容 |
+| --- | --- | --- |
+| GET | `/subscriptions` | 一覧。`?filter=open/active/paused/ended/all`（既定 open = 終了以外）、`?no=` で番号検索 |
+| POST | `/contacts/:id/subscriptions` | 里親の詳細からサブスク開始（最初のメニュー・数量・開始日） |
+| GET | `/subscriptions/:id` | 詳細（オン／オフ、メニュー、契約情報、終了） |
+| POST | `/subscriptions/:id/status` | `action=turn_on / turn_off / end` |
+| POST | `/subscriptions/:id/memo` | メモ変更 |
+| POST | `/subscriptions/:id/items` | メニュー追加 |
+| POST | `/subscription-items/:itemId/remove` | メニューを外す |
+| GET / POST | `/menus`、`/menus/:id` | メニュー一覧・追加・編集（販売中／販売停止の切り替え） |
+
+- ヘッダーに「サブスク」へのリンク。里親の詳細画面に「サブスク」欄（一覧と開始フォーム）
+- 状態は色だけでなく「オン」「オフ（休止中）」「終了」の文字で表示
+- CSV エクスポートに `subscriptions`（1行 = サブスク × メニュー）を追加

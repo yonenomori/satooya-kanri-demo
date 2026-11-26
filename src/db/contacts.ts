@@ -9,6 +9,7 @@
  */
 import { extractCity, normalizeAddress, normalizePhone } from '../lib/normalize';
 import { categoryLabel, channelLabel, kindLabel, statusLabel } from '../lib/labels';
+import { formatSubscriptionNo, subscriptionStatusLabel } from '../lib/subscription';
 
 export type ContactKind = 'adopter' | 'breeder';
 
@@ -512,10 +513,10 @@ export async function revokeNgRecord(
 /* CSV エクスポート（管理者のみ）                                      */
 /* ------------------------------------------------------------------ */
 
-export type ExportTable = 'contacts' | 'ng_records' | 'notes';
+export type ExportTable = 'contacts' | 'ng_records' | 'notes' | 'subscriptions';
 
 export function isExportTable(value: string): value is ExportTable {
-  return value === 'contacts' || value === 'ng_records' || value === 'notes';
+  return value === 'contacts' || value === 'ng_records' || value === 'notes' || value === 'subscriptions';
 }
 
 type ExportRow = (string | number | null)[];
@@ -604,6 +605,77 @@ export async function exportRows(
       row.revoked_at,
       row.revoked_by_name,
       row.revoke_reason,
+    ]);
+    return { headers, rows };
+  }
+
+  if (table === 'subscriptions') {
+    // 1 行 = サブスクに入っているメニュー 1 つ（メニューが無いサブスクも 1 行出す）
+    const result = await db
+      .prepare(
+        `SELECT s.id, s.status, s.started_on, s.ended_on, s.end_reason, s.memo,
+                c.id AS contact_id, c.name AS contact_name,
+                m.name AS menu_name, m.price AS menu_price, i.quantity,
+                i.created_at AS item_added_at, i.removed_at AS item_removed_at,
+                cb.name AS created_by_name, s.created_at
+           FROM subscriptions s
+           JOIN contacts c ON c.id = s.contact_id
+           LEFT JOIN subscription_items i ON i.subscription_id = s.id
+           LEFT JOIN menus m ON m.id = i.menu_id
+           LEFT JOIN staff cb ON cb.id = s.created_by
+          ORDER BY s.id, i.id`
+      )
+      .all<{
+        id: number;
+        status: string;
+        started_on: string;
+        ended_on: string | null;
+        end_reason: string | null;
+        memo: string | null;
+        contact_id: number;
+        contact_name: string;
+        menu_name: string | null;
+        menu_price: number | null;
+        quantity: number | null;
+        item_added_at: string | null;
+        item_removed_at: string | null;
+        created_by_name: string | null;
+        created_at: string;
+      }>();
+
+    const headers = [
+      '管理番号',
+      '状態',
+      '連絡先ID',
+      '対象者',
+      '開始日',
+      '終了日',
+      '終了理由',
+      'メモ',
+      'メニュー',
+      '価格',
+      '数量',
+      'メニュー追加日時',
+      'メニューを外した日時',
+      '登録スタッフ',
+      '登録日時',
+    ];
+    const rows = (result.results ?? []).map((row) => [
+      formatSubscriptionNo(row.id),
+      subscriptionStatusLabel(row.status),
+      row.contact_id,
+      row.contact_name,
+      row.started_on,
+      row.ended_on,
+      row.end_reason,
+      row.memo,
+      row.menu_name,
+      row.menu_price,
+      row.quantity,
+      row.item_added_at,
+      row.item_removed_at,
+      row.created_by_name,
+      row.created_at,
     ]);
     return { headers, rows };
   }
