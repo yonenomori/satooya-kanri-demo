@@ -1,0 +1,47 @@
+# 本番反映: テスト → D1 マイグレーション → デプロイ
+#
+# リポジトリ変数 DEPLOY_ENABLED が "true" のときだけ動く。
+#   - 実案件: Settings → Secrets and variables → Actions → Variables に DEPLOY_ENABLED=true を登録し、
+#             CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID をシークレットに登録する（docs/deploy.md）
+#   - このデモ: 変数を登録していないので、main へ push してもデプロイはスキップされる
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: test
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # GitHub の Environment「production」に承認者を設定すると、反映前に人の承認を挟める
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: マイグレーション適用と本番デプロイ
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: |
+            d1 migrations apply satooya-db --remote
+            deploy

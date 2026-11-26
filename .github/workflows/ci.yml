@@ -1,0 +1,29 @@
+# main への push と PR ごとに、型チェック・テスト・脆弱性チェックを行う
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: 型チェック
+        run: npm run typecheck
+      - name: テスト
+        run: npm test
+      - name: 既知の脆弱性チェック（high以上で失敗）
+        run: npm audit --audit-level=high
