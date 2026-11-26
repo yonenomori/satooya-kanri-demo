@@ -184,4 +184,4 @@ Cloudflare アカウントと Access の設定が必要です。手順は [docs/
 
 - テストは標準の **Vitest**（Node 環境）で実行しています。DB に依存しない純粋関数と、小さな D1 スタブで照合ロジックを検証する構成です。実案件では `@cloudflare/vitest-pool-workers` で workerd 上の D1 に対してテストする想定です
 - `wrangler.jsonc` の `database_id` はプレースホルダー（`00000000-...`）、`vars` はダミー値です
-- `deploy.yml` はデモでは本番環境を持たないため手動実行のみ、`ci.yml` は main への push と PR で実行します
+- `ci.yml` は main への push と PR で実行します。`deploy.yml` はリポジトリ変数 `DEPLOY_ENABLED=true` のときだけ動き、このデモでは未設定のためスキップされます（デモ環境への反映は上の `wrangler.demo.jsonc` の手順で手動）

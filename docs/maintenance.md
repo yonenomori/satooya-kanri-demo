@@ -24,6 +24,7 @@
 4. Settings → Secrets and variables → Actions に登録
    - `CLOUDFLARE_API_TOKEN`：先方アカウントで発行。権限は Workers Scripts:Edit と D1:Edit のみ
    - `CLOUDFLARE_ACCOUNT_ID`：先方のアカウントID
+   - Variables タブに `DEPLOY_ENABLED` = `true`（未設定なら deploy.yml は何もしない）
 5. 通知: Watch を「Custom → Security alerts」以上にしておく
 
 ## マージの判断基準

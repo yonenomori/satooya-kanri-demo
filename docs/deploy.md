@@ -70,6 +70,7 @@ Access を通すとリクエストに `Cf-Access-Jwt-Assertion` ヘッダーが�
 1. Settings → Secrets and variables → Actions
    - `CLOUDFLARE_API_TOKEN` … Workers Scripts:Edit と D1:Edit のみの権限で発行
    - `CLOUDFLARE_ACCOUNT_ID` … 先方のアカウント ID
+   - Variables タブに `DEPLOY_ENABLED` = `true`（これが無いと deploy.yml はスキップされる）
 2. Settings → Environments で `production` を作り、Required reviewers に自分を入れる
 3. Settings → Branches で main を保護（PR 必須、CI の `test` を必須チェックに）
 
